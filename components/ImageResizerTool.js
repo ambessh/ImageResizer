@@ -94,8 +94,15 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   }, [initialPresetSlug]);
 
   // Handle #tool auto-scroll directly to Step 2 (Next Box)
+  // Handle #tool auto-scroll directly to Step 2 (Next Box) + Trigger Toast
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.hash === "#tool") {
+      // 1. Toast trigger karo jaise main grid mein hota hai
+      if (selectedPreset) {
+        triggerToast(`✓ ${selectedPreset.title} selected!`);
+      }
+
+      // 2. Smooth scroll to Step 2 box
       const timer = setTimeout(() => {
         if (stepDocRef.current) {
           stepDocRef.current.scrollIntoView({ behavior: "smooth", block: "center" });

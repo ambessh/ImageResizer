@@ -204,50 +204,29 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     }, 1200);
   };
 
-  // Dynamic filename generator
 const getDownloadFileName = () => {
-    // 1. Original file name me se extension strip karo (e.g. "classic123.png" -> "classic123")
-    let rawBase = "image";
-    if (originalFileName) {
-      const dotIndex = originalFileName.lastIndexOf(".");
-      rawBase = dotIndex !== -1 ? originalFileName.substring(0, dotIndex) : originalFileName;
-    }
-    // Spaces aur special characters ko clean karo
-    const cleanOriginalName = rawBase.replace(/[^a-zA-Z0-9_-]/g, "");
+    // 1. Original filename bina extension
+    let raw = originalFileName ? originalFileName.substring(0, originalFileName.lastIndexOf(".") || originalFileName.length) : "img";
+    const name = raw.replace(/[^a-zA-Z0-9]/g, "");
 
-    // 2. Exam Name ko Title Case banao (e.g. "jee-main" ya "jee" -> "Jee")
-    let examName = "Exam";
+    // 2. Exam ka sirf pehla word (e.g. "SSC CGL" -> "SSC", "jee" -> "JEE")
+    let exam = "Exam";
     if (selectedPreset) {
-      const sourceName = selectedPreset.shortName || selectedPreset.slug || "exam";
-      examName = sourceName
-        .split(/[-_ ]+/)
-        .filter(Boolean)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join("_");
+      const src = selectedPreset.shortName || selectedPreset.slug || "Exam";
+      exam = src.split(/[-_ ]+/)[0].toUpperCase();
     }
 
-    // 3. Document Type ko Title Case banao (e.g. "Photograph" -> "Photo", "Signature" -> "Signature")
-    let docType = "Document";
-    if (currentDoc && currentDoc.label) {
-      const label = currentDoc.label.trim();
-      if (/photo/i.test(label)) {
-        docType = "Photo";
-      } else if (/thumb/i.test(label)) {
-        docType = "Thumb";
-      } else if (/sign/i.test(label)) {
-        docType = "Signature";
-      } else {
-        // Kisi aur doc type ke liye clean Title Case
-        docType = label
-          .split(/[-_ ]+/)
-          .filter(Boolean)
-          .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-          .join("_");
-      }
+    // 3. Short doc type (Photo, Sign, Thumb)
+    let type = "Doc";
+    if (currentDoc?.label) {
+      const l = currentDoc.label.toLowerCase();
+      if (l.includes("photo")) type = "Photo";
+      else if (l.includes("sign")) type = "Sign";
+      else if (l.includes("thumb")) type = "Thumb";
     }
 
-    // 4. Final formatted output
-    return `Resized_${examName}_${docType}_${cleanOriginalName}.jpg`;
+    // Output: JEE_Photo_classic123.jpg
+    return `${exam}_${type}_${name}.jpg`;
   };
 
   return (

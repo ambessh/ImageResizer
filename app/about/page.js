@@ -22,7 +22,7 @@ export default function AboutUs() {
         
         {/* Intro Subtitle */}
         <p className="mt-3 text-base text-slate-600 leading-relaxed">
-          Welcome to <strong className="font-semibold text-slate-900">Exam Photo Resizer</strong> — an intuitive, fast, and privacy-first utility built specifically for students, job applicants, and cyber cafe operators.
+          Welcome to <strong className="font-semibold text-slate-900">ResizeWala</strong> — an intuitive, fast, and privacy-first utility built specifically for students, job applicants, and cyber cafe operators.
         </p>
 
         <hr className="my-8 border-slate-200" />

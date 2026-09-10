@@ -205,23 +205,49 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   };
 
   // Dynamic filename generator
-  const getDownloadFileName = () => {
+const getDownloadFileName = () => {
+    // 1. Original file name me se extension strip karo (e.g. "classic123.png" -> "classic123")
+    let rawBase = "image";
     if (originalFileName) {
       const dotIndex = originalFileName.lastIndexOf(".");
-      if (dotIndex !== -1) {
-        const base = originalFileName.substring(0, dotIndex);
-        return `${base}-resized.jpg`;
+      rawBase = dotIndex !== -1 ? originalFileName.substring(0, dotIndex) : originalFileName;
+    }
+    // Spaces aur special characters ko clean karo
+    const cleanOriginalName = rawBase.replace(/[^a-zA-Z0-9_-]/g, "");
+
+    // 2. Exam Name ko Title Case banao (e.g. "jee-main" ya "jee" -> "Jee")
+    let examName = "Exam";
+    if (selectedPreset) {
+      const sourceName = selectedPreset.shortName || selectedPreset.slug || "exam";
+      examName = sourceName
+        .split(/[-_ ]+/)
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join("_");
+    }
+
+    // 3. Document Type ko Title Case banao (e.g. "Photograph" -> "Photo", "Signature" -> "Signature")
+    let docType = "Document";
+    if (currentDoc && currentDoc.label) {
+      const label = currentDoc.label.trim();
+      if (/photo/i.test(label)) {
+        docType = "Photo";
+      } else if (/thumb/i.test(label)) {
+        docType = "Thumb";
+      } else if (/sign/i.test(label)) {
+        docType = "Signature";
+      } else {
+        // Kisi aur doc type ke liye clean Title Case
+        docType = label
+          .split(/[-_ ]+/)
+          .filter(Boolean)
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join("_");
       }
-      return `${originalFileName}-resized.jpg`;
     }
 
-    if (selectedPreset && currentDoc) {
-      const safePreset = selectedPreset.slug.replace(/[^a-zA-Z0-9_-]/g, "");
-      const safeDoc = currentDoc.label.toLowerCase().replace(/\s+/g, "-");
-      return `${safePreset}-${safeDoc}-resized.jpg`;
-    }
-
-    return "resized-document.jpg";
+    // 4. Final formatted output
+    return `Resized_${examName}_${docType}_${cleanOriginalName}.jpg`;
   };
 
   return (
@@ -255,7 +281,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
               </>
             ) : (
               <>
-                Exam <span className="text-emerald-700">Resize</span>
+                Resize<span className="text-emerald-700">Wala</span>
               </>
             )}
           </h1>

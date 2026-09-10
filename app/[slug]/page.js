@@ -16,7 +16,7 @@ export async function generateMetadata({ params }) {
 
   if (!preset) {
     return {
-      title: "Preset Not Found - ExamResize",
+      title: "Preset Not Found - ResizeWala",
     };
   }
 

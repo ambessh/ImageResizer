@@ -40,7 +40,7 @@ export default function Contact() {
               href="mailto:support@examphotoresizer.com" 
               className="mt-0.5 inline-block text-sm font-medium text-emerald-700 hover:text-emerald-800 hover:underline"
             >
-              support@examphotoresizer.com
+              resizewala.help@gmail.com
             </a>
             <p className="mt-1 text-xs text-slate-500">
               We typically reply within 24–48 business hours.

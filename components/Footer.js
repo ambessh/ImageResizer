@@ -36,10 +36,10 @@ export default function Footer() {
           <div className="sm:col-span-2 space-y-3">
             <div className="flex items-center gap-2 font-bold text-lg text-slate-900 tracking-tight">
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 font-bold text-white text-xs">
-                E
+                R
               </div>
               <span>
-                Exam<span className="text-emerald-700">Resize</span>
+                Resize<span className="text-emerald-700">Wala</span>
               </span>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
@@ -95,7 +95,7 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
-          <p>© {new Date().getFullYear()} ExamResize. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ResizeWala. All rights reserved.</p>
           <p className="text-[11px]">Not affiliated with any government recruitment authority.</p>
         </div>
 

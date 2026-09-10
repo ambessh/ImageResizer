@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { PRESETS } from "../config/presets";
 import Cropper from "cropperjs";
 import "cropperjs/dist/cropper.css";
@@ -10,6 +10,7 @@ import { processAndCompressImage } from "../utils/imageProcessor";
 
 export default function ImageResizerTool({ initialPresetSlug }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   // 1. Initial State
   const initialPreset = initialPresetSlug
@@ -43,7 +44,31 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   const [isReCropping, setIsReCropping] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // 5. Toast & Smooth Scroll Guided Flow
+  const [toastMessage, setToastMessage] = useState("");
   const fileInputRef = useRef(null);
+  const stepDocRef = useRef(null);
+  const stepUploadRef = useRef(null);
+  const stepPreviewRef = useRef(null);
+
+  const triggerToast = (msg) => {
+    setToastMessage(msg);
+  };
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => {
+      setToastMessage("");
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
+
+  const smoothScrollTo = (ref) => {
+    // 60ms delay ensures DOM paints the updated step before scrolling
+    setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  };
 
   const categories = ["All", ...new Set(PRESETS.map((p) => p.category))];
 
@@ -56,6 +81,31 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     return matchesCat && matchesSearch;
   });
 
+  // Sync initialPresetSlug when route changes via Link
+  useEffect(() => {
+    if (initialPresetSlug) {
+      const matched = PRESETS.find((p) => p.slug === initialPresetSlug);
+      if (matched) {
+        setSelectedPreset(matched);
+        setActiveSubDocIndex(0);
+        setCurrentStep(2);
+      }
+    }
+  }, [initialPresetSlug]);
+
+  // Handle #tool auto-scroll directly to Step 2 (Next Box)
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#tool") {
+      const timer = setTimeout(() => {
+        if (stepDocRef.current) {
+          stepDocRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [selectedPreset, initialPresetSlug]);
+
   // Sync state whenever selected preset/sub-doc updates
   useEffect(() => {
     if (currentDoc) {
@@ -65,15 +115,28 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     }
   }, [selectedPreset, activeSubDocIndex, currentDoc]);
 
-  const handlePresetSelect = (preset) => {
+  // STEP 1: SINGLE CLICK PRESET SELECTION + SCROLL
+  const handlePresetSelect = (preset, e) => {
+    if (e) e.preventDefault(); // Prevents full Next.js page reset jump
+
     setSelectedPreset(preset);
     setActiveSubDocIndex(0);
     setCurrentStep(2);
+
+    // Update browser URL quietly without breaking the scroll
+    window.history.pushState(null, "", `/${preset.slug}`);
+
+    triggerToast(`✓ ${preset.title} selected!`);
+    smoothScrollTo(stepDocRef);
   };
 
+  // STEP 2: DOC SELECT -> TOAST + SCROLL TO UPLOAD
   const handleSubDocSelect = (idx) => {
     setActiveSubDocIndex(idx);
     setCurrentStep(3);
+    const docName = selectedPreset?.subDocs?.[idx]?.label || "Document";
+    triggerToast(`✓ ${docName} selected!`);
+    smoothScrollTo(stepUploadRef);
   };
 
   const handleCancelCrop = () => {
@@ -85,9 +148,10 @@ export default function ImageResizerTool({ initialPresetSlug }) {
       });
     }
     setCurrentStep(5);
+    smoothScrollTo(stepPreviewRef);
   };
 
-  // UPLOAD HANDLER WITH LOADER
+  // STEP 3: UPLOAD HANDLER -> TOAST + OPEN CROPPER
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -96,6 +160,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
       setImgSrc("");
       setProcessedResult(null);
       setCurrentStep(4);
+      triggerToast("Uploading photo...");
 
       const reader = new FileReader();
       reader.onload = () => {
@@ -103,6 +168,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
           setImgSrc(reader.result?.toString() || "");
           setIsUploading(false);
           setShowCropModal(true);
+          triggerToast("✓ Image loaded! Align in cropper.");
         }, 150);
       };
       reader.onerror = () => {
@@ -112,7 +178,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     }
   };
 
-  // RE-CROP HANDLER WITH LOADER
+  // RE-CROP HANDLER
   const handleReCropClick = () => {
     setIsReCropping(true);
     setTimeout(() => {
@@ -121,9 +187,10 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     }, 100);
   };
 
-  // DOWNLOAD HANDLER WITH LOADER
+  // STEP 5: DOWNLOAD HANDLER -> TOAST
   const handleDownloadClick = () => {
     setIsDownloading(true);
+    triggerToast("✓ Image downloaded successfully!");
     setTimeout(() => {
       setIsDownloading(false);
       setCurrentStep(0);
@@ -151,7 +218,19 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   };
 
   return (
-    <div className="bg-white text-slate-900 selection:bg-emerald-100 selection:text-emerald-900 py-4 sm:py-6">
+    <div className="bg-white text-slate-900 selection:bg-emerald-100 selection:text-emerald-900 py-4 sm:py-6 relative">
+      {/* SCREEN CENTER FLOATING POPUP (Mobile & Desktop Unified) */}
+      {toastMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-4">
+          <div className="bg-slate-900/90 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center gap-3 transform scale-100 animate-in fade-in zoom-in-95 duration-200">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs sm:text-sm font-semibold tracking-wide">
+              {toastMessage}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto space-y-6">
         {/* UNIFIED DYNAMIC HERO HEADER */}
         <div className="text-center space-y-2 pt-2">
@@ -236,12 +315,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
                 <Link
                   key={preset.id}
                   href={targetUrl}
-                  onClick={(e) => {
-                    if (pathname === targetUrl) {
-                      e.preventDefault();
-                    }
-                    handlePresetSelect(preset);
-                  }}
+                  onClick={(e) => handlePresetSelect(preset, e)}
                   className={`text-left p-3 rounded-xl border transition relative block ${
                     isSelected
                       ? "bg-emerald-700 text-white border-emerald-700 shadow-sm"
@@ -271,9 +345,11 @@ export default function ImageResizerTool({ initialPresetSlug }) {
           </div>
         </div>
 
-        {/* 2. SUB-DOCUMENTS SELECTION (Step 2) */}
+        {/* 2. SUB-DOCUMENTS SELECTION (Step 2 - Auto-Scroll Target) */}
         <div
-          className={`rounded-2xl p-5 transition-all duration-300 bg-slate-50/70 border border-slate-200 ${
+          id="tool"
+          ref={stepDocRef}
+          className={`rounded-2xl p-5 transition-all duration-300 bg-slate-50/70 border border-slate-200 scroll-mt-20 ${
             currentStep === 2 ? shineEffect : ""
           }`}
         >
@@ -326,9 +402,10 @@ export default function ImageResizerTool({ initialPresetSlug }) {
 
         {/* 3. UPLOAD & PREVIEW WORKSPACE */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-          {/* Upload Box with Dedicated Loader */}
+          {/* Upload Box */}
           <div
-            className={`relative border rounded-2xl p-6 bg-slate-50/70 flex flex-col justify-between transition-all duration-300 min-h-[300px] ${
+            ref={stepUploadRef}
+            className={`relative border rounded-2xl p-6 bg-slate-50/70 flex flex-col justify-between transition-all duration-300 min-h-[300px] scroll-mt-6 ${
               currentStep === 3 ? shineEffect : "border-slate-200"
             }`}
           >
@@ -383,9 +460,10 @@ export default function ImageResizerTool({ initialPresetSlug }) {
             </label>
           </div>
 
-          {/* Preview & Download Box with Dedicated Loaders */}
+          {/* Preview & Download Box */}
           <div
-            className={`relative border rounded-2xl p-6 flex flex-col justify-between min-h-[300px] transition-all duration-300 bg-slate-50/70 ${
+            ref={stepPreviewRef}
+            className={`relative border rounded-2xl p-6 flex flex-col justify-between min-h-[300px] transition-all duration-300 bg-slate-50/70 scroll-mt-6 ${
               currentStep === 5 ? shineEffect : "border-slate-200"
             }`}
           >
@@ -485,8 +563,9 @@ export default function ImageResizerTool({ initialPresetSlug }) {
             onApplyCrop={async (croppedDataUrl) => {
               setShowCropModal(false);
               setIsCompressing(true);
+              triggerToast("Optimizing to exact exam specs...");
+              smoothScrollTo(stepPreviewRef);
 
-              // Small delay for clean UI cycle
               await new Promise((resolve) => setTimeout(resolve, 50));
 
               const result = await processAndCompressImage(
@@ -498,6 +577,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
               setProcessedResult(result);
               setIsCompressing(false);
               setCurrentStep(5);
+              triggerToast("✓ Ready to download!");
             }}
           />
         )}
@@ -551,7 +631,6 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
   const handleDone = async () => {
     setIsProcessing(true);
 
-    // Yield control to let the spinner paint on the screen
     await new Promise((resolve) => setTimeout(resolve, 60));
 
     try {

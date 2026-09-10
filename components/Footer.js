@@ -20,13 +20,13 @@ export default function Footer() {
           
           <div className="flex flex-wrap gap-2">
             {PRESETS.map((preset) => (
-              <Link
-                key={preset.id}
-                href={`/${preset.slug}`}
-                className="text-xs text-slate-600 hover:text-emerald-700 bg-white hover:border-emerald-600 border border-slate-200 px-2.5 py-1.5 rounded-lg transition shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-              >
-                {preset.title}
-              </Link>
+             <Link
+  key={preset.id}
+  href={`/${preset.slug}#tool`}
+  className="text-xs text-slate-600 hover:text-emerald-700 bg-white hover:border-emerald-600 border border-slate-200 px-2.5 py-1.5 rounded-lg transition"
+>
+  {preset.title}
+</Link>
             ))}
           </div>
         </div>

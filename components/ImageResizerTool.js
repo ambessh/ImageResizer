@@ -567,25 +567,31 @@ export default function ImageResizerTool({ initialPresetSlug }) {
             }
             onCancel={handleCancelCrop}
             onApplyCrop={async (croppedDataUrl) => {
-              setShowCropModal(false);
               setIsCompressing(true);
               triggerToast("Optimizing to exact exam specs...");
               smoothScrollTo(stepPreviewRef);
 
               await new Promise((resolve) => setTimeout(resolve, 50));
 
-              const result = await processAndCompressImage(
-                croppedDataUrl,
-                currentDoc?.width || width,
-                currentDoc?.height || height,
-                currentDoc?.maxKB || maxKB,
-                currentDoc?.minKB || minKB
-              );
+              try {
+                const result = await processAndCompressImage(
+                  croppedDataUrl,
+                  currentDoc?.width || width,
+                  currentDoc?.height || height,
+                  currentDoc?.maxKB || maxKB,
+                  currentDoc?.minKB || minKB
+                );
 
-              setProcessedResult(result);
-              setIsCompressing(false);
-              setCurrentStep(5);
-              triggerToast("✓ Ready to download!");
+                setProcessedResult(result);
+                setCurrentStep(5);
+                triggerToast("✓ Ready to download!");
+              } catch (error) {
+                console.error("Compression failed:", error);
+                triggerToast("Failed to process image. Please try again.");
+              } finally {
+                setIsCompressing(false);
+                setShowCropModal(false);
+              }
             }}
           />
         )}
@@ -599,6 +605,7 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
   const cropperRef = React.useRef(null);
   const [zoomLevel, setZoomLevel] = React.useState(1);
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isCancelling, setIsCancelling] = React.useState(false);
 
   React.useEffect(() => {
     if (!imageRef.current) return;
@@ -636,25 +643,49 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
     setZoomLevel(val);
   };
 
-  const handleDone = async () => {
+  const handleInternalCancel = () => {
+    if (isProcessing || isCancelling) return;
+    setIsCancelling(true);
+
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        onCancel();
+      }, 30);
+    });
+  };
+
+  const handleDone = () => {
+    if (isProcessing || isCancelling) return;
     setIsProcessing(true);
 
-    try {
-      if (!cropperRef.current) return;
-      const canvas = cropperRef.current.getCroppedCanvas({
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: "high",
-      });
+    requestAnimationFrame(() => {
+      setTimeout(async () => {
+        try {
+          if (!cropperRef.current) return;
 
-      // Pass high-quality cropped dataUrl directly to parent
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
-      await onApplyCrop(dataUrl);
-    } catch (error) {
-      console.error("Crop export failed:", error);
-    } finally {
-      setIsProcessing(false);
-    }
+          const canvas = cropperRef.current.getCroppedCanvas({
+            maxWidth: 2048,
+            maxHeight: 2048,
+            imageSmoothingEnabled: true,
+            imageSmoothingQuality: "high",
+          });
+
+          if (!canvas) {
+            await onApplyCrop(imgSrc);
+            return;
+          }
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+          await onApplyCrop(dataUrl);
+        } catch (error) {
+          console.error("Crop export failed:", error);
+          setIsProcessing(false);
+        }
+      }, 30);
+    });
   };
+
+  const isBusy = isProcessing || isCancelling;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-6 backdrop-blur-sm">
@@ -666,9 +697,9 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
           </div>
           <button
             type="button"
-            disabled={isProcessing}
-            onClick={onCancel}
-            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition disabled:opacity-50"
+            disabled={isBusy}
+            onClick={handleInternalCancel}
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ✕
           </button>
@@ -688,8 +719,8 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
               step="0.05"
               value={zoomLevel}
               onChange={handleZoomSlider}
-              disabled={isProcessing}
-              className="flex-1 accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+              disabled={isBusy}
+              className="flex-1 accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <span className="text-xs font-mono text-slate-600 w-10 text-right">
               {Math.round(zoomLevel * 100)}%
@@ -701,24 +732,24 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
               <button
                 type="button"
                 onClick={() => handleRotate(-90)}
-                disabled={isProcessing}
-                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition disabled:opacity-50"
+                disabled={isBusy}
+                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 ↺ Rotate Left
               </button>
               <button
                 type="button"
                 onClick={() => handleRotate(90)}
-                disabled={isProcessing}
-                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition disabled:opacity-50"
+                disabled={isBusy}
+                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 ↻ Rotate Right
               </button>
               <button
                 type="button"
                 onClick={handleFlip}
-                disabled={isProcessing}
-                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition disabled:opacity-50"
+                disabled={isBusy}
+                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 ⇄ Flip
               </button>
@@ -726,8 +757,8 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
             <button
               type="button"
               onClick={() => cropperRef.current?.reset()}
-              disabled={isProcessing}
-              className="text-xs text-slate-500 hover:text-slate-800 transition underline disabled:opacity-50"
+              disabled={isBusy}
+              className="text-xs text-slate-500 hover:text-slate-800 transition underline disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Reset
             </button>
@@ -737,37 +768,35 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
         <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center gap-3">
           <button
             type="button"
-            disabled={isProcessing}
-            onClick={onCancel}
-            className="flex-1 py-2 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+            disabled={isBusy}
+            onClick={handleInternalCancel}
+            className="flex-1 py-2 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Cancel
+            {isCancelling ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+                <span>Closing...</span>
+              </>
+            ) : (
+              "Cancel"
+            )}
           </button>
           <button
             type="button"
             onClick={handleDone}
-            disabled={isProcessing}
-            className="flex-[2] py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition active:scale-[0.99] flex items-center justify-center gap-2"
+            disabled={isBusy}
+            className="flex-[2] py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-600/80 text-white text-xs font-semibold shadow-sm transition active:scale-[0.99] flex items-center justify-center gap-2 disabled:cursor-not-allowed"
           >
             {isProcessing ? (
               <>
                 <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Processing...</span>
+                <span>Optimizing...</span>
               </>
             ) : (
               "Apply Crop"
             )}
           </button>
         </div>
-
-        {isProcessing && (
-          <div className="absolute inset-0 bg-white/85 backdrop-blur-xs z-50 flex flex-col items-center justify-center gap-3 rounded-2xl transition-all">
-            <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs font-medium text-slate-700 animate-pulse">
-              Optimizing to exact exam specs...
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );

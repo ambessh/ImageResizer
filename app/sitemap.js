@@ -1,24 +1,26 @@
-import { EXAM_PRESETS } from '@/config/presets';
+import { PRESETS } from '@/config/presets';
 
 export default async function sitemap() {
-  // Apna exact live domain ya Vercel URL yahan set karein
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://yourdomain.com';
+  // Apna Vercel link ya custom domain yahan verify/update karein
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://imageresizer.vercel.app';
 
-  // 15 dynamic pSEO preset pages ke liye automated entries
-  const presetUrls = EXAM_PRESETS.map((preset) => ({
+  // 1. Static root page
+  const routes = [
+    {
+      url: baseUrl,
+      lastModified: new Date().toISOString(),
+      changeFrequency: 'daily',
+      priority: 1.0,
+    },
+  ];
+
+  // 2. Dynamic 27 exam preset pages
+  const presetRoutes = PRESETS.map((preset) => ({
     url: `${baseUrl}/${preset.slug}`,
-    lastModified: new Date(),
+    lastModified: new Date().toISOString(),
     changeFrequency: 'weekly',
     priority: 0.8,
   }));
 
-  return [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 1.0,
-    },
-    ...presetUrls,
-  ];
+  return [...routes, ...presetRoutes];
 }

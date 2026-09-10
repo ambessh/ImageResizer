@@ -1,5 +1,5 @@
+export const dynamic = 'force-static';
 import { PRESETS } from '@/config/presets';
-
 export default async function sitemap() {
 const baseUrl = "https://www.resizewala.in";
   const currentDate = new Date();

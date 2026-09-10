@@ -59,7 +59,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     if (!toastMessage) return;
     const timer = setTimeout(() => {
       setToastMessage("");
-    }, 4000);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [toastMessage]);
 

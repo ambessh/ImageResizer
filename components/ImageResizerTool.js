@@ -31,6 +31,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   const [width, setWidth] = useState(350);
   const [height, setHeight] = useState(450);
   const [maxKB, setMaxKB] = useState(50);
+  const [minKB, setMinKB] = useState(20);
 
   // 3. Image & Processed States
   const [imgSrc, setImgSrc] = useState("");
@@ -38,7 +39,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   const [processedResult, setProcessedResult] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
 
-  // 4. Granular Loaders for Every Stage
+  // 4. Granular Loaders
   const [isUploading, setIsUploading] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isReCropping, setIsReCropping] = useState(false);
@@ -64,7 +65,6 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   }, [toastMessage]);
 
   const smoothScrollTo = (ref) => {
-    // 60ms delay ensures DOM paints the updated step before scrolling
     setTimeout(() => {
       ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 60);
@@ -81,7 +81,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     return matchesCat && matchesSearch;
   });
 
-  // Sync initialPresetSlug when route changes via Link
+  // Sync initialPresetSlug when route changes
   useEffect(() => {
     if (initialPresetSlug) {
       const matched = PRESETS.find((p) => p.slug === initialPresetSlug);
@@ -93,16 +93,12 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     }
   }, [initialPresetSlug]);
 
-  // Handle #tool auto-scroll directly to Step 2 (Next Box)
-  // Handle #tool auto-scroll directly to Step 2 (Next Box) + Trigger Toast
+  // Handle #tool auto-scroll
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.hash === "#tool") {
-      // 1. Toast trigger karo jaise main grid mein hota hai
       if (selectedPreset) {
         triggerToast(`✓ ${selectedPreset.title} selected!`);
       }
-
-      // 2. Smooth scroll to Step 2 box
       const timer = setTimeout(() => {
         if (stepDocRef.current) {
           stepDocRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -113,31 +109,31 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     }
   }, [selectedPreset, initialPresetSlug]);
 
-  // Sync state whenever selected preset/sub-doc updates
+  // Sync state whenever current sub-doc updates
   useEffect(() => {
     if (currentDoc) {
-      setWidth(currentDoc.width);
-      setHeight(currentDoc.height);
-      setMaxKB(currentDoc.maxKB);
+      setWidth(currentDoc.width || 350);
+      setHeight(currentDoc.height || 450);
+      setMaxKB(currentDoc.maxKB || 50);
+      setMinKB(currentDoc.minKB || 10);
     }
   }, [selectedPreset, activeSubDocIndex, currentDoc]);
 
-  // STEP 1: SINGLE CLICK PRESET SELECTION + SCROLL
+  // STEP 1: PRESET SELECTION
   const handlePresetSelect = (preset, e) => {
-    if (e) e.preventDefault(); // Prevents full Next.js page reset jump
+    if (e) e.preventDefault();
 
     setSelectedPreset(preset);
     setActiveSubDocIndex(0);
     setCurrentStep(2);
 
-    // Update browser URL quietly without breaking the scroll
     window.history.pushState(null, "", `/${preset.slug}`);
 
     triggerToast(`✓ ${preset.title} selected!`);
     smoothScrollTo(stepDocRef);
   };
 
-  // STEP 2: DOC SELECT -> TOAST + SCROLL TO UPLOAD
+  // STEP 2: DOC SELECT
   const handleSubDocSelect = (idx) => {
     setActiveSubDocIndex(idx);
     setCurrentStep(3);
@@ -158,7 +154,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     smoothScrollTo(stepPreviewRef);
   };
 
-  // STEP 3: UPLOAD HANDLER -> TOAST + OPEN CROPPER
+  // STEP 3: UPLOAD HANDLER
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -194,7 +190,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     }, 100);
   };
 
-  // STEP 5: DOWNLOAD HANDLER -> TOAST
+  // STEP 5: DOWNLOAD HANDLER
   const handleDownloadClick = () => {
     setIsDownloading(true);
     triggerToast("✓ Image downloaded successfully!");
@@ -204,19 +200,18 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     }, 1200);
   };
 
-const getDownloadFileName = () => {
-    // 1. Original filename bina extension
-    let raw = originalFileName ? originalFileName.substring(0, originalFileName.lastIndexOf(".") || originalFileName.length) : "img";
+  const getDownloadFileName = () => {
+    let raw = originalFileName
+      ? originalFileName.substring(0, originalFileName.lastIndexOf(".") || originalFileName.length)
+      : "img";
     const name = raw.replace(/[^a-zA-Z0-9]/g, "");
 
-    // 2. Exam ka sirf pehla word (e.g. "SSC CGL" -> "SSC", "jee" -> "JEE")
     let exam = "Exam";
     if (selectedPreset) {
       const src = selectedPreset.shortName || selectedPreset.slug || "Exam";
       exam = src.split(/[-_ ]+/)[0].toUpperCase();
     }
 
-    // 3. Short doc type (Photo, Sign, Thumb)
     let type = "Doc";
     if (currentDoc?.label) {
       const l = currentDoc.label.toLowerCase();
@@ -225,13 +220,12 @@ const getDownloadFileName = () => {
       else if (l.includes("thumb")) type = "Thumb";
     }
 
-    // Output: JEE_Photo_classic123.jpg
     return `${exam}_${type}_${name}.jpg`;
   };
 
   return (
     <div className="bg-white text-slate-900 selection:bg-emerald-100 selection:text-emerald-900 py-4 sm:py-6 relative">
-      {/* SCREEN CENTER FLOATING POPUP (Mobile & Desktop Unified) */}
+      {/* Toast */}
       {toastMessage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-4">
           <div className="bg-slate-900/90 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center gap-3 transform scale-100 animate-in fade-in zoom-in-95 duration-200">
@@ -244,7 +238,7 @@ const getDownloadFileName = () => {
       )}
 
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* UNIFIED DYNAMIC HERO HEADER */}
+        {/* Dynamic Hero Header */}
         <div className="text-center space-y-2 pt-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium transition-all">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
@@ -267,12 +261,12 @@ const getDownloadFileName = () => {
 
           <p className="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto transition-all">
             {selectedPreset
-              ? `Prescribed pixel dimensions & file size caps loaded. Select document type below.`
+              ? "Prescribed pixel dimensions & file size caps loaded. Select document type below."
               : "Choose your exam, upload your document, and get the exact dimensions & KB limit verified."}
           </p>
         </div>
 
-        {/* 1. HEADER & PRESETS (Step 1) */}
+        {/* 1. Header & Presets (Step 1) */}
         <div
           className={`bg-slate-50/70 border rounded-2xl p-5 space-y-4 transition-all duration-300 ${
             currentStep === 1 ? shineEffect : "border-slate-200"
@@ -357,7 +351,7 @@ const getDownloadFileName = () => {
           </div>
         </div>
 
-        {/* 2. SUB-DOCUMENTS SELECTION (Step 2 - Auto-Scroll Target) */}
+        {/* 2. Sub-Documents Selection (Step 2) */}
         <div
           id="tool"
           ref={stepDocRef}
@@ -396,7 +390,7 @@ const getDownloadFileName = () => {
                       {isCurrent && <span className="text-emerald-700 font-bold">✓</span>}
                     </div>
                     <div className="text-[11px] text-slate-600 font-medium mt-1">
-                      Max {doc.maxKB} KB
+                      {doc.minKB ? `${doc.minKB} - ${doc.maxKB} KB` : `Max ${doc.maxKB} KB`}
                     </div>
                     <div className="text-[10px] text-slate-400 mt-0.5 truncate">
                       {doc.dimensionsLabel}
@@ -412,7 +406,7 @@ const getDownloadFileName = () => {
           )}
         </div>
 
-        {/* 3. UPLOAD & PREVIEW WORKSPACE */}
+        {/* 3. Upload & Preview Workspace */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
           {/* Upload Box */}
           <div
@@ -454,7 +448,7 @@ const getDownloadFileName = () => {
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
                       {currentDoc
-                        ? `Target: ${width} x ${height} px • Max ${maxKB} KB`
+                        ? `Target: ${width} x ${height} px • ${currentDoc.minKB ? `${currentDoc.minKB}-${currentDoc.maxKB}` : `Max ${maxKB}`} KB`
                         : "Select an exam above first"}
                     </p>
                   </div>
@@ -558,11 +552,11 @@ const getDownloadFileName = () => {
         <div className="flex items-center justify-between text-xs text-slate-500 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl">
           <span>Portal Target Cap:</span>
           <span className="font-mono font-semibold text-emerald-700">
-            Under {currentDoc?.maxKB || selectedPreset?.subDocs?.[0]?.maxKB || 50} KB (Auto-optimized)
+            {currentDoc?.minKB ? `${currentDoc.minKB} - ${currentDoc.maxKB} KB` : `Under ${maxKB} KB`} (Auto-optimized)
           </span>
         </div>
 
-        {/* CROP MODAL POPUP */}
+        {/* Crop Modal Popup */}
         {showCropModal && imgSrc && (
           <StudioCropModal
             imgSrc={imgSrc}
@@ -584,8 +578,10 @@ const getDownloadFileName = () => {
                 croppedDataUrl,
                 currentDoc?.width || width,
                 currentDoc?.height || height,
-                currentDoc?.maxKB || maxKB || 50
+                currentDoc?.maxKB || maxKB,
+                currentDoc?.minKB || minKB
               );
+
               setProcessedResult(result);
               setIsCompressing(false);
               setCurrentStep(5);
@@ -643,17 +639,19 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
   const handleDone = async () => {
     setIsProcessing(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 60));
-
     try {
       if (!cropperRef.current) return;
       const canvas = cropperRef.current.getCroppedCanvas({
         imageSmoothingEnabled: true,
         imageSmoothingQuality: "high",
       });
-      await onApplyCrop(canvas.toDataURL("image/jpeg", 0.95));
+
+      // Pass high-quality cropped dataUrl directly to parent
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+      await onApplyCrop(dataUrl);
     } catch (error) {
-      console.error("Crop/Compress failed:", error);
+      console.error("Crop export failed:", error);
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -754,7 +752,7 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
             {isProcessing ? (
               <>
                 <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Optimizing Specs...</span>
+                <span>Processing...</span>
               </>
             ) : (
               "Apply Crop"
@@ -762,7 +760,6 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
           </button>
         </div>
 
-        {/* CROP MODAL OVERLAY LOADER */}
         {isProcessing && (
           <div className="absolute inset-0 bg-white/85 backdrop-blur-xs z-50 flex flex-col items-center justify-center gap-3 rounded-2xl transition-all">
             <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />

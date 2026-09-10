@@ -35,15 +35,6 @@ export const PRESETS = [
         minKB: 10,
         dimensionsLabel: "Horizontal (10 KB - 200 KB)",
       },
-      {
-        id: "doc-caste",
-        label: "Category / PwD Certificate",
-        width: 800,
-        height: 1100,
-        maxKB: 300,
-        minKB: 50,
-        dimensionsLabel: "Original Document (50 - 300 KB)",
-      },
     ],
   },
 
@@ -93,12 +84,12 @@ export const PRESETS = [
       },
       {
         id: "sign",
-        label: "Signature (Triple Sign Vertical)",
+        label: "Signature",
         width: 400,
         height: 400,
         maxKB: 100,
         minKB: 20,
-        dimensionsLabel: "3 Vertical Signs (20-100 KB)",
+        dimensionsLabel: "Clear Signature on White Paper (20-100 KB)",
       },
     ],
   },
@@ -177,7 +168,7 @@ export const PRESETS = [
     ],
   },
 
-  // 6. Global US & Schengen Visa (High-CPC / Evergreen)
+  // 6. Global US & Schengen Visa
   {
     id: "us-schengen-visa",
     title: "US DS-160 & Schengen Visa",
@@ -233,7 +224,7 @@ export const PRESETS = [
     ],
   },
 
-  // 8. GATE / JAM (IITs)
+  // 8. GATE / IIT JAM
   {
     id: "gate-exam",
     title: "GATE / IIT JAM",
@@ -643,7 +634,7 @@ export const PRESETS = [
     ],
   },
 
-  // 22. Voter ID Card (NVSP / ECI ECIS Portal)
+  // 22. Voter ID Card (NVSP / ECI Portal)
   {
     id: "voter-id-eci",
     title: "Voter ID Card (Election Commission)",
@@ -746,7 +737,7 @@ export const PRESETS = [
     ],
   },
 
-  // 26. KVS & NVS Recruitment (Kendriya / Navodaya Vidyalaya)
+  // 26. KVS & NVS Recruitment
   {
     id: "kvs-nvs-teaching",
     title: "KVS / NVS Teacher Recruitment",

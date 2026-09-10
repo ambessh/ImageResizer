@@ -36,14 +36,69 @@ export default async function PresetPage({ params }) {
     notFound();
   }
 
+  // Google Schema Markup (Software Application + FAQ)
+  const softwareSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: `${preset.title} Photo & Signature Resizer`,
+    operatingSystem: "All",
+    applicationCategory: "UtilitiesApplication",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "INR",
+    },
+  };
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "Why does my application portal reject my photo upload?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Most government recruitment portals run automatic server validators. If your file is even 1KB over the limit or if the aspect ratio doesn't match the required dimensions, the portal rejects the file instantly.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Will compression make my signature or face blurry?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Our engine uses bicubic canvas interpolation with binary search compression, ensuring that edges and handwritten ink strokes stay crisp while strictly meeting the file size cap.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Is it safe to format government exam documents here?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes, 100%. No photographs or signatures ever leave your phone or computer. All processing happens in local browser memory.",
+        },
+      },
+    ],
+  };
+
   return (
     <main className="min-h-screen bg-white text-slate-900 selection:bg-emerald-100 selection:text-emerald-900 pb-6">
-      {/* 1. Main Interactive Tool */}
+      {/* 1. Google Rich Snippets / SEO Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+
+      {/* 2. Main Interactive Tool */}
       <section className="max-w-5xl mx-auto px-4 pt-6 mb-12">
         <ImageResizerTool initialPresetSlug={preset.slug} />
       </section>
 
-      {/* 2. Structured Information & Reusable Table */}
+      {/* 3. Structured Information & Reusable Table */}
       <div className="max-w-5xl mx-auto px-4 space-y-10">
         
         {/* Step-by-Step Instructions */}
@@ -93,7 +148,7 @@ export default async function PresetPage({ params }) {
           </div>
         </section>
 
-        {/* 3. Reusable Shared Reference Table */}
+        {/* 4. Reusable Shared Reference Table */}
         <PresetTable activeSlug={preset.slug} />
 
         {/* Official Portal Disclaimer */}

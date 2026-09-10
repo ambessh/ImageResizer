@@ -1,7 +1,7 @@
 import { PRESETS } from '@/config/presets';
 
 export default async function sitemap() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://imageresizer.vercel.app';
+const baseUrl = "https://www.resizewala.in";
   const currentDate = new Date();
 
   // 1. Static root page

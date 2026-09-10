@@ -44,6 +44,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   const [isCompressing, setIsCompressing] = useState(false);
   const [isReCropping, setIsReCropping] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
   // 5. Toast & Smooth Scroll Guided Flow
   const [toastMessage, setToastMessage] = useState("");
   const fileInputRef = useRef(null);
@@ -556,7 +557,6 @@ export default function ImageResizerTool({ initialPresetSlug }) {
         </div>
 
         {/* Crop Modal Popup */}
-        {/* Crop Modal Popup */}
         {showCropModal && imgSrc && (
           <StudioCropModal
             imgSrc={imgSrc}
@@ -567,29 +567,25 @@ export default function ImageResizerTool({ initialPresetSlug }) {
             }
             onCancel={handleCancelCrop}
             onApplyCrop={async (croppedDataUrl) => {
-              if (isCompressing) return;
-              setIsCompressing(true);
               setShowCropModal(false);
+              setIsCompressing(true);
               triggerToast("Optimizing to exact exam specs...");
               smoothScrollTo(stepPreviewRef);
 
               await new Promise((resolve) => setTimeout(resolve, 50));
 
-              try {
-                const result = await processAndCompressImage(
-                  croppedDataUrl,
-                  currentDoc?.width || width,
-                  currentDoc?.height || height,
-                  currentDoc?.maxKB || maxKB,
-                  currentDoc?.minKB || minKB
-                );
+              const result = await processAndCompressImage(
+                croppedDataUrl,
+                currentDoc?.width || width,
+                currentDoc?.height || height,
+                currentDoc?.maxKB || maxKB,
+                currentDoc?.minKB || minKB
+              );
 
-                setProcessedResult(result);
-                setCurrentStep(5);
-                triggerToast("✓ Ready to download!");
-              } finally {
-                setIsCompressing(false);
-              }
+              setProcessedResult(result);
+              setIsCompressing(false);
+              setCurrentStep(5);
+              triggerToast("✓ Ready to download!");
             }}
           />
         )}

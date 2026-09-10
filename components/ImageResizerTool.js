@@ -3,8 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
-import "react-image-crop/dist/ReactCrop.css";
 import { PRESETS } from "../config/presets";
 import Cropper from "cropperjs";
 import "cropperjs/dist/cropper.css";
@@ -13,7 +11,7 @@ import { processAndCompressImage } from "../utils/imageProcessor";
 export default function ImageResizerTool({ initialPresetSlug }) {
   const pathname = usePathname();
 
-  // 1. Initial State: Slug hone par match karega, direct Home par null rahega
+  // 1. Initial State
   const initialPreset = initialPresetSlug
     ? PRESETS.find((p) => p.slug === initialPresetSlug) || null
     : null;
@@ -22,28 +20,29 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   const [activeSubDocIndex, setActiveSubDocIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-
-  // Step indicator
   const [currentStep, setCurrentStep] = useState(initialPreset ? 2 : 1);
   const shineEffect =
     "!border-emerald-600 ring-2 ring-emerald-500/20 shadow-md transition-all duration-300";
 
   const currentDoc = selectedPreset?.subDocs?.[activeSubDocIndex] || null;
 
-  // 2. Sliders / Specs Defaults
+  // 2. Specs Defaults
   const [width, setWidth] = useState(350);
   const [height, setHeight] = useState(450);
   const [maxKB, setMaxKB] = useState(50);
 
-  // 3. Image & Crop States
+  // 3. Image & Processed States
   const [imgSrc, setImgSrc] = useState("");
-  const [crop, setCrop] = useState();
-  const [completedCrop, setCompletedCrop] = useState(null);
+  const [originalFileName, setOriginalFileName] = useState("");
   const [processedResult, setProcessedResult] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
 
-  const imgRef = useRef(null);
+  // 4. Granular Loaders for Every Stage
+  const [isUploading, setIsUploading] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [isReCropping, setIsReCropping] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const fileInputRef = useRef(null);
 
   const categories = ["All", ...new Set(PRESETS.map((p) => p.category))];
@@ -63,18 +62,8 @@ export default function ImageResizerTool({ initialPresetSlug }) {
       setWidth(currentDoc.width);
       setHeight(currentDoc.height);
       setMaxKB(currentDoc.maxKB);
-
-      if (imgRef.current && completedCrop) {
-        generateCroppedOutput(
-          imgRef.current,
-          completedCrop,
-          currentDoc.width,
-          currentDoc.height,
-          currentDoc.maxKB
-        );
-      }
     }
-  }, [selectedPreset, activeSubDocIndex]);
+  }, [selectedPreset, activeSubDocIndex, currentDoc]);
 
   const handlePresetSelect = (preset) => {
     setSelectedPreset(preset);
@@ -98,116 +87,73 @@ export default function ImageResizerTool({ initialPresetSlug }) {
     setCurrentStep(5);
   };
 
+  // UPLOAD HANDLER WITH LOADER
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsUploading(true);
+      setOriginalFileName(file.name);
       setImgSrc("");
       setProcessedResult(null);
       setCurrentStep(4);
+
       const reader = new FileReader();
-      reader.addEventListener("load", () => {
-        setImgSrc(reader.result?.toString() || "");
-        setShowCropModal(true);
-      });
+      reader.onload = () => {
+        setTimeout(() => {
+          setImgSrc(reader.result?.toString() || "");
+          setIsUploading(false);
+          setShowCropModal(true);
+        }, 150);
+      };
+      reader.onerror = () => {
+        setIsUploading(false);
+      };
       reader.readAsDataURL(file);
     }
   };
 
-  const onImageLoad = (e) => {
-    const img = e.currentTarget || e.target;
-    imgRef.current = img;
-    const { naturalWidth, naturalHeight } = img;
-    const aspect = width / height;
-
-    if (naturalWidth && naturalHeight) {
-      const initialCrop = centerCrop(
-        makeAspectCrop(
-          { unit: "%", width: 90 },
-          aspect,
-          naturalWidth,
-          naturalHeight
-        ),
-        naturalWidth,
-        naturalHeight
-      );
-      setCrop(initialCrop);
-      setCompletedCrop(initialCrop);
-    }
+  // RE-CROP HANDLER WITH LOADER
+  const handleReCropClick = () => {
+    setIsReCropping(true);
+    setTimeout(() => {
+      setShowCropModal(true);
+      setIsReCropping(false);
+    }, 100);
   };
 
-  const generateCroppedOutput = async (image, pixelCrop, targetW, targetH, targetKB) => {
-    if (!pixelCrop || !image) return;
-    setIsProcessing(true);
+  // DOWNLOAD HANDLER WITH LOADER
+  const handleDownloadClick = () => {
+    setIsDownloading(true);
+    setTimeout(() => {
+      setIsDownloading(false);
+      setCurrentStep(0);
+    }, 1200);
+  };
 
-    const canvas = document.createElement("canvas");
-    canvas.width = targetW;
-    canvas.height = targetH;
-    const ctx = canvas.getContext("2d");
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, targetW, targetH);
-
-    const scaleX = image.naturalWidth / image.width;
-    const scaleY = image.naturalHeight / image.height;
-
-    ctx.drawImage(
-      image,
-      pixelCrop.x * scaleX,
-      pixelCrop.y * scaleY,
-      pixelCrop.width * scaleX,
-      pixelCrop.height * scaleY,
-      0,
-      0,
-      targetW,
-      targetH
-    );
-
-    let minQ = 0.05;
-    let maxQ = 0.98;
-    let bestDataUrl = "";
-    let bestSizeKB = 0;
-
-    for (let i = 0; i < 6; i++) {
-      const midQ = (minQ + maxQ) / 2;
-      const dataUrl = canvas.toDataURL("image/jpeg", midQ);
-      const sizeKB = getBase64SizeInKB(dataUrl);
-
-      if (sizeKB <= targetKB) {
-        bestDataUrl = dataUrl;
-        bestSizeKB = sizeKB;
-        minQ = midQ;
-      } else {
-        maxQ = midQ;
+  // Dynamic filename generator
+  const getDownloadFileName = () => {
+    if (originalFileName) {
+      const dotIndex = originalFileName.lastIndexOf(".");
+      if (dotIndex !== -1) {
+        const base = originalFileName.substring(0, dotIndex);
+        return `${base}-resized.jpg`;
       }
+      return `${originalFileName}-resized.jpg`;
     }
 
-    if (!bestDataUrl) {
-      bestDataUrl = canvas.toDataURL("image/jpeg", 0.1);
-      bestSizeKB = getBase64SizeInKB(bestDataUrl);
+    if (selectedPreset && currentDoc) {
+      const safePreset = selectedPreset.slug.replace(/[^a-zA-Z0-9_-]/g, "");
+      const safeDoc = currentDoc.label.toLowerCase().replace(/\s+/g, "-");
+      return `${safePreset}-${safeDoc}-resized.jpg`;
     }
 
-    setProcessedResult({
-      dataUrl: bestDataUrl,
-      sizeKB: bestSizeKB,
-      width: targetW,
-      height: targetH,
-    });
-    setIsProcessing(false);
-  };
-
-  const getBase64SizeInKB = (base64Str) => {
-    const cleanStr = base64Str.split(",")[1] || base64Str;
-    const bufferLen = cleanStr.length * 0.75;
-    return Math.round(bufferLen / 1024);
+    return "resized-document.jpg";
   };
 
   return (
     <div className="bg-white text-slate-900 selection:bg-emerald-100 selection:text-emerald-900 py-4 sm:py-6">
       <div className="max-w-5xl mx-auto space-y-6">
-        
-  {/* UNIFIED DYNAMIC HERO HEADER */}
+        {/* UNIFIED DYNAMIC HERO HEADER */}
         <div className="text-center space-y-2 pt-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium transition-all">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
@@ -380,9 +326,9 @@ export default function ImageResizerTool({ initialPresetSlug }) {
 
         {/* 3. UPLOAD & PREVIEW WORKSPACE */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-          {/* Upload Box */}
+          {/* Upload Box with Dedicated Loader */}
           <div
-            className={`border rounded-2xl p-6 bg-slate-50/70 flex flex-col justify-between transition-all duration-300 min-h-[300px] ${
+            className={`relative border rounded-2xl p-6 bg-slate-50/70 flex flex-col justify-between transition-all duration-300 min-h-[300px] ${
               currentStep === 3 ? shineEffect : "border-slate-200"
             }`}
           >
@@ -391,46 +337,55 @@ export default function ImageResizerTool({ initialPresetSlug }) {
               type="file"
               accept="image/*"
               onChange={handleFileChange}
-              disabled={!selectedPreset}
+              disabled={!selectedPreset || isUploading}
               className="hidden"
               id="file-upload"
             />
             <label
-              htmlFor={selectedPreset ? "file-upload" : undefined}
+              htmlFor={selectedPreset && !isUploading ? "file-upload" : undefined}
               className={`flex-1 flex flex-col items-center justify-center text-center space-y-3 p-4 border-2 border-dashed rounded-xl transition ${
-                selectedPreset
+                selectedPreset && !isUploading
                   ? "cursor-pointer border-slate-300 bg-white hover:border-emerald-600 hover:bg-emerald-50/20"
                   : "cursor-not-allowed border-slate-200 bg-slate-100/60 opacity-70"
               }`}
             >
-              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-2xl font-bold">
-                +
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  {currentDoc ? `Upload ${currentDoc.label}` : "Upload Document"}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  {currentDoc
-                    ? `Target: ${width} x ${height} px • Max ${maxKB} KB`
-                    : "Select an exam above first"}
-                </p>
-              </div>
-              <span
-                className={`inline-block px-4 py-2 text-white text-xs font-semibold rounded-lg transition shadow-sm ${
-                  selectedPreset
-                    ? "bg-emerald-700 hover:bg-emerald-800"
-                    : "bg-slate-400 pointer-events-none"
-                }`}
-              >
-                Browse Image
-              </span>
+              {isUploading ? (
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="w-10 h-10 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs font-semibold text-emerald-800">Reading image file...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-2xl font-bold">
+                    +
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {currentDoc ? `Upload ${currentDoc.label}` : "Upload Document"}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {currentDoc
+                        ? `Target: ${width} x ${height} px • Max ${maxKB} KB`
+                        : "Select an exam above first"}
+                    </p>
+                  </div>
+                  <span
+                    className={`inline-block px-4 py-2 text-white text-xs font-semibold rounded-lg transition shadow-sm ${
+                      selectedPreset
+                        ? "bg-emerald-700 hover:bg-emerald-800"
+                        : "bg-slate-400 pointer-events-none"
+                    }`}
+                  >
+                    Browse Image
+                  </span>
+                </>
+              )}
             </label>
           </div>
 
-          {/* Preview & Download Box */}
+          {/* Preview & Download Box with Dedicated Loaders */}
           <div
-            className={`border rounded-2xl p-6 flex flex-col justify-between min-h-[300px] transition-all duration-300 bg-slate-50/70 ${
+            className={`relative border rounded-2xl p-6 flex flex-col justify-between min-h-[300px] transition-all duration-300 bg-slate-50/70 ${
               currentStep === 5 ? shineEffect : "border-slate-200"
             }`}
           >
@@ -442,7 +397,13 @@ export default function ImageResizerTool({ initialPresetSlug }) {
                 Review your output before saving.
               </p>
 
-              {processedResult ? (
+              {isCompressing ? (
+                <div className="flex flex-col items-center justify-center h-44 border-2 border-dashed border-emerald-300 rounded-xl bg-emerald-50/30 text-emerald-800 text-xs space-y-2.5">
+                  <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                  <span className="font-semibold animate-pulse">Running binary search compression...</span>
+                  <span className="text-[11px] text-slate-500">Enforcing strict dimensions & KB limits</span>
+                </div>
+              ) : processedResult ? (
                 <div className="flex flex-col items-center justify-center space-y-3">
                   <div className="relative border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white p-2 max-w-[200px]">
                     <img
@@ -465,101 +426,50 @@ export default function ImageResizerTool({ initialPresetSlug }) {
               )}
             </div>
 
-            {processedResult && (
+            {processedResult && !isCompressing && (
               <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setShowCropModal(true)}
-                  className="flex-1 py-2 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                  onClick={handleReCropClick}
+                  disabled={isReCropping}
+                  className="flex-1 py-2 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
-                  Re-crop
+                  {isReCropping ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
+                      <span>Opening...</span>
+                    </>
+                  ) : (
+                    "Re-crop"
+                  )}
                 </button>
 
                 <a
                   href={processedResult.dataUrl}
-                  download="resized-exam-doc.jpg"
-                  onClick={() => setCurrentStep(0)}
-                  className="flex-[2] inline-flex items-center justify-center py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg transition shadow-sm active:scale-[0.99]"
+                  download={getDownloadFileName()}
+                  onClick={handleDownloadClick}
+                  className="flex-[2] inline-flex items-center justify-center py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg transition shadow-sm active:scale-[0.99] gap-2"
                 >
-                  Download Image
+                  {isDownloading ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Downloading...</span>
+                    </>
+                  ) : (
+                    "Download Image"
+                  )}
                 </a>
               </div>
             )}
           </div>
         </div>
 
-        {/* 4. MANUAL FINE-TUNING SLIDERS */}
-        <div className="bg-slate-50/70 border border-slate-200 rounded-2xl p-5 space-y-4">
-          <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-            Manual Fine-Tuning (Optional)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div>
-              <div className="flex justify-between text-xs text-slate-600 mb-1.5 font-medium">
-                <span>Width (px)</span>
-                <span className="font-semibold text-slate-900 font-mono">{width} px</span>
-              </div>
-              <input
-                type="range"
-                min="50"
-                max="1200"
-                value={width}
-                disabled={!selectedPreset}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setWidth(val);
-                  if (imgRef.current && completedCrop) {
-                    generateCroppedOutput(imgRef.current, completedCrop, val, height, maxKB);
-                  }
-                }}
-                className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer disabled:opacity-50"
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs text-slate-600 mb-1.5 font-medium">
-                <span>Height (px)</span>
-                <span className="font-semibold text-slate-900 font-mono">{height} px</span>
-              </div>
-              <input
-                type="range"
-                min="50"
-                max="1200"
-                value={height}
-                disabled={!selectedPreset}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setHeight(val);
-                  if (imgRef.current && completedCrop) {
-                    generateCroppedOutput(imgRef.current, completedCrop, width, val, maxKB);
-                  }
-                }}
-                className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer disabled:opacity-50"
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs text-slate-600 mb-1.5 font-medium">
-                <span>Max File Size (KB)</span>
-                <span className="font-semibold text-slate-900 font-mono">{maxKB} KB</span>
-              </div>
-              <input
-                type="range"
-                min="5"
-                max="500"
-                value={maxKB}
-                disabled={!selectedPreset}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setMaxKB(val);
-                  if (imgRef.current && completedCrop) {
-                    generateCroppedOutput(imgRef.current, completedCrop, width, height, val);
-                  }
-                }}
-                className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer disabled:opacity-50"
-              />
-            </div>
-          </div>
+        {/* Portal Target Cap Badge */}
+        <div className="flex items-center justify-between text-xs text-slate-500 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl">
+          <span>Portal Target Cap:</span>
+          <span className="font-mono font-semibold text-emerald-700">
+            Under {currentDoc?.maxKB || selectedPreset?.subDocs?.[0]?.maxKB || 50} KB (Auto-optimized)
+          </span>
         </div>
 
         {/* CROP MODAL POPUP */}
@@ -574,6 +484,11 @@ export default function ImageResizerTool({ initialPresetSlug }) {
             onCancel={handleCancelCrop}
             onApplyCrop={async (croppedDataUrl) => {
               setShowCropModal(false);
+              setIsCompressing(true);
+
+              // Small delay for clean UI cycle
+              await new Promise((resolve) => setTimeout(resolve, 50));
+
               const result = await processAndCompressImage(
                 croppedDataUrl,
                 currentDoc?.width || width,
@@ -581,6 +496,7 @@ export default function ImageResizerTool({ initialPresetSlug }) {
                 currentDoc?.maxKB || maxKB || 50
               );
               setProcessedResult(result);
+              setIsCompressing(false);
               setCurrentStep(5);
             }}
           />
@@ -594,6 +510,7 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
   const imageRef = React.useRef(null);
   const cropperRef = React.useRef(null);
   const [zoomLevel, setZoomLevel] = React.useState(1);
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   React.useEffect(() => {
     if (!imageRef.current) return;
@@ -630,18 +547,29 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
     cropperRef.current?.zoomTo(val);
     setZoomLevel(val);
   };
-  const handleDone = () => {
-    if (!cropperRef.current) return;
-    const canvas = cropperRef.current.getCroppedCanvas({
-      imageSmoothingEnabled: true,
-      imageSmoothingQuality: "high",
-    });
-    onApplyCrop(canvas.toDataURL("image/jpeg", 0.95));
+
+  const handleDone = async () => {
+    setIsProcessing(true);
+
+    // Yield control to let the spinner paint on the screen
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    try {
+      if (!cropperRef.current) return;
+      const canvas = cropperRef.current.getCroppedCanvas({
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: "high",
+      });
+      await onApplyCrop(canvas.toDataURL("image/jpeg", 0.95));
+    } catch (error) {
+      console.error("Crop/Compress failed:", error);
+      setIsProcessing(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-6 backdrop-blur-sm">
-      <div className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full flex flex-col overflow-hidden shadow-xl">
+      <div className="relative bg-white border border-slate-200 rounded-2xl max-w-xl w-full flex flex-col overflow-hidden shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div>
             <h3 className="text-slate-900 font-semibold text-base sm:text-lg">Adjust & Align Photo</h3>
@@ -649,8 +577,9 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
           </div>
           <button
             type="button"
+            disabled={isProcessing}
             onClick={onCancel}
-            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition"
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition disabled:opacity-50"
           >
             ✕
           </button>
@@ -670,6 +599,7 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
               step="0.05"
               value={zoomLevel}
               onChange={handleZoomSlider}
+              disabled={isProcessing}
               className="flex-1 accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
             />
             <span className="text-xs font-mono text-slate-600 w-10 text-right">
@@ -682,21 +612,24 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
               <button
                 type="button"
                 onClick={() => handleRotate(-90)}
-                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition"
+                disabled={isProcessing}
+                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition disabled:opacity-50"
               >
                 ↺ Rotate Left
               </button>
               <button
                 type="button"
                 onClick={() => handleRotate(90)}
-                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition"
+                disabled={isProcessing}
+                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition disabled:opacity-50"
               >
                 ↻ Rotate Right
               </button>
               <button
                 type="button"
                 onClick={handleFlip}
-                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition"
+                disabled={isProcessing}
+                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition disabled:opacity-50"
               >
                 ⇄ Flip
               </button>
@@ -704,7 +637,8 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
             <button
               type="button"
               onClick={() => cropperRef.current?.reset()}
-              className="text-xs text-slate-500 hover:text-slate-800 transition underline"
+              disabled={isProcessing}
+              className="text-xs text-slate-500 hover:text-slate-800 transition underline disabled:opacity-50"
             >
               Reset
             </button>
@@ -714,19 +648,38 @@ function StudioCropModal({ imgSrc, aspectRatio = 3.5 / 4.5, onCancel, onApplyCro
         <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center gap-3">
           <button
             type="button"
+            disabled={isProcessing}
             onClick={onCancel}
-            className="flex-1 py-2 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+            className="flex-1 py-2 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleDone}
-            className="flex-[2] py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm transition active:scale-[0.99]"
+            disabled={isProcessing}
+            className="flex-[2] py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition active:scale-[0.99] flex items-center justify-center gap-2"
           >
-            Apply Crop
+            {isProcessing ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Optimizing Specs...</span>
+              </>
+            ) : (
+              "Apply Crop"
+            )}
           </button>
         </div>
+
+        {/* CROP MODAL OVERLAY LOADER */}
+        {isProcessing && (
+          <div className="absolute inset-0 bg-white/85 backdrop-blur-xs z-50 flex flex-col items-center justify-center gap-3 rounded-2xl transition-all">
+            <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs font-medium text-slate-700 animate-pulse">
+              Optimizing to exact exam specs...
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

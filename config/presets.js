@@ -819,4 +819,40 @@ export const PRESETS = [
       },
     ],
   },
+  // 28 Aadhaar Card / ID Proof
+  {
+    id: "aadhaar-id-proof",
+    title: "Aadhaar Card / Identity Proof",
+    category: "ID Proofs",
+    slug: "aadhaar-card-id-resizer",
+    subDocs: [
+      {
+        id: "front-back",
+        label: "Front / Full Card (Single Side)",
+        width: 1050,
+        height: 650,
+        maxKB: 200,
+        minKB: 50,
+        dimensionsLabel: "Standard ID Card (50 KB - 200 KB)",
+      },
+      {
+        id: "combined",
+        label: "Both Sides Combined (Front + Back)",
+        width: 1200,
+        height: 800,
+        maxKB: 300,
+        minKB: 50,
+        dimensionsLabel: "Merged Copy (50 KB - 300 KB)",
+      },
+      {
+        id: "pdf-crop",
+        label: "e-Aadhaar Cutout",
+        width: 1000,
+        height: 600,
+        maxKB: 100,
+        minKB: 20,
+        dimensionsLabel: "Govt Portal Upload (Under 100 KB)",
+      },
+    ],
+  },
 ];

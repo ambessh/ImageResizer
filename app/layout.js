@@ -5,6 +5,9 @@ export const metadata = {
   metadataBase: new URL('https://www.resizewala.in'),
   title: 'ResizeWala - Official Exam Photo & Signature Resizer',
   description: 'Resize and compress government exam documents strictly under official KB and dimension limits.',
+  verification: {
+    google: '9NB-yZlDL565jh1Ivvz-u6-BVTmMx3jAqgKvZicLteY',
+  },
 };
 
 export default function RootLayout({ children }) {

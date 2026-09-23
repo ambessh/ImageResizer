@@ -32,7 +32,8 @@ export default function PresetTable() {
                   {/* 1. Exam Title with Clean Link */}
                   <td className="py-3.5 px-4 sm:px-6 font-medium text-slate-900 leading-snug">
                    <Link
-  href={`/${preset.slug}#tool`}
+  href={`/${preset.slug}`}
+  scroll={false}
   className="hover:text-emerald-700 hover:underline transition-colors block"
 >
   {preset.title}

@@ -94,20 +94,25 @@ export default function ImageResizerTool({ initialPresetSlug }) {
   }, [initialPresetSlug]);
 
   // Handle #tool auto-scroll
+ // Handle auto-scroll only on preset/slug routes
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hash === "#tool") {
-      if (selectedPreset) {
-        triggerToast(`✓ ${selectedPreset.title} selected!`);
-      }
-      const timer = setTimeout(() => {
-        if (stepDocRef.current) {
-          stepDocRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 100);
-
-      return () => clearTimeout(timer);
+    // 1. Skip scrolling if on the homepage or if no preset is selected
+    if (typeof window === "undefined" || pathname === "/" || !selectedPreset) {
+      return;
     }
-  }, [selectedPreset, initialPresetSlug]);
+
+    // 2. Show toast feedback for the preset
+    triggerToast(`✓ ${selectedPreset.title} selected!`);
+
+    // 3. Scroll to the tool container
+    const timer = setTimeout(() => {
+      if (stepDocRef.current) {
+        stepDocRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [pathname, selectedPreset, initialPresetSlug]);
 
   // Sync state whenever current sub-doc updates
   useEffect(() => {

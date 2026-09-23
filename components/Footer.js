@@ -22,7 +22,8 @@ export default function Footer() {
             {PRESETS.map((preset) => (
              <Link
   key={preset.id}
-  href={`/${preset.slug}#tool`}
+  href={`/${preset.slug}`}
+  scroll={false}
   className="text-xs text-slate-600 hover:text-emerald-700 bg-white hover:border-emerald-600 border border-slate-200 px-2.5 py-1.5 rounded-lg transition"
 >
   {preset.title}
